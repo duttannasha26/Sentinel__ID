@@ -63,11 +63,32 @@ export default function AnalysisResults({ caseData, onDecide, decided }) {
         </div>
       </div>
 
+      {caseData.strictness && (
+        <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-100 rounded-lg px-3 py-1.5">
+          <span>Verification Sensitivity: <strong className="capitalize text-slate-700">{caseData.strictness}</strong> mode</span>
+          {caseData.face_match_score === 0 && (
+            <span className="text-rose-600 font-semibold flex items-center gap-1">
+              <XCircle className="w-3.5 h-3.5" /> Biometric Mismatch (0 Score)
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
         <ScoreBadge label="Tamper Risk" score={caseData.tamper_score} invert />
         <ScoreBadge label="Face Match" score={caseData.face_match_score} />
         <ScoreBadge label="Judge Score" score={caseData.judge_score} />
       </div>
+
+      {caseData.face_match_score === 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs text-rose-800 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-rose-900">Biometric Verification Alert (0 Match Score)</p>
+            <p className="mt-0.5">The live facial scan does not match the photo on the identity document under the selected verification strictness. Manual inspection is strongly advised before decision.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4 text-sm text-slate-600">
         <div className="bg-slate-50 rounded-xl p-4">

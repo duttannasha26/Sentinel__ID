@@ -16,9 +16,16 @@ const DOC_TYPES = [
   { value: "permit", label: "Permit" },
 ];
 
+const STRICTNESS_LEVELS = [
+  { value: "lenient", label: "Lenient (Low Threshold)" },
+  { value: "standard", label: "Standard (Border Security)" },
+  { value: "strict", label: "Strict (High Security / Strict 0 Score)" },
+];
+
 export default function NewCase() {
   const navigate = useNavigate();
   const [documentType, setDocumentType] = useState("passport");
+  const [strictness, setStrictness] = useState("standard");
   const [documentImageUrl, setDocumentImageUrl] = useState(null);
   const [liveFaceUrl, setLiveFaceUrl] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -27,8 +34,18 @@ export default function NewCase() {
   const runVerification = async () => {
     setAnalyzing(true);
     const [docRes, faceRes] = await Promise.all([
-      base44.functions.invoke("analyzeDocument", { document_image_url: documentImageUrl, document_type: documentType }),
-      base44.functions.invoke("matchFaces", { document_image_url: documentImageUrl, live_face_image_url: liveFaceUrl }),
+      base44.functions.invoke("analyzeDocument", {
+        document_image_url: documentImageUrl,
+        live_face_image_url: liveFaceUrl,
+        document_type: documentType,
+        strictness
+      }),
+      base44.functions.invoke("matchFaces", {
+        document_image_url: documentImageUrl,
+        live_face_image_url: liveFaceUrl,
+        document_type: documentType,
+        strictness
+      }),
     ]);
     const doc = docRes.data;
     const face = faceRes.data;
@@ -38,6 +55,7 @@ export default function NewCase() {
       document_type: documentType,
       document_image_url: documentImageUrl,
       live_face_image_url: liveFaceUrl,
+      strictness,
       extracted_fields: doc.extracted_fields,
       tamper_score: doc.tamper_score,
       tamper_findings: doc.tamper_findings,
@@ -77,14 +95,25 @@ export default function NewCase() {
 
       {!caseData ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-8">
-          <div>
-            <label className="text-sm font-medium text-slate-700 mb-2 block">Document Type</label>
-            <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {DOC_TYPES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">Document Type</label>
+              <Select value={documentType} onValueChange={setDocumentType}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DOC_TYPES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">Match Sensitivity / Strictness</label>
+              <Select value={strictness} onValueChange={setStrictness}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STRICTNESS_LEVELS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>

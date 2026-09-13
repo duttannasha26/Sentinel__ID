@@ -2,89 +2,11 @@ import { base44 as rawClient } from './client';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, getDoc, doc, setDoc, updateDoc, query, orderBy, limit as limitQuery } from 'firebase/firestore';
 
+import { analyzeBiometricAndDocumentMatch } from '@/lib/faceAnalyzer';
+import { getStoredCases, setStoredCases, getStoredSyntheticDocs, setStoredSyntheticDocs, isForceOffline } from '@/lib/offlineManager';
+
 // Initial local sample data for immediate local preview & fallback
-const initialCases = [
-  {
-    id: "case-101",
-    created_date: new Date(Date.now() - 3600000 * 2).toISOString(),
-    document_type: "passport",
-    document_image_url: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop&q=60",
-    live_face_image_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=60",
-    extracted_fields: {
-      name: "ELEANOR VANCE",
-      passport_number: "P98234112",
-      nationality: "USA",
-      date_of_birth: "1990-05-14",
-      date_of_expiry: "2030-08-20",
-      gender: "F"
-    },
-    tamper_score: 5,
-    tamper_findings: [],
-    tamper_summary: "No signs of physical or digital manipulation detected. Holographic elements, font metrics, and MRZ checksums align with standard issuing templates.",
-    face_match_score: 96,
-    face_match_summary: "Biometric facial landmarks (interocular distance, jawline structure, nose bridge) show exceptionally high match confidence against live scan.",
-    judge_score: 96,
-    status: "decided",
-    decision: "approved",
-    officer_notes: "Document and facial scan verified cleanly. Approved entry.",
-    decided_by: "Officer Alex Mercer",
-    decided_at: new Date(Date.now() - 3600000 * 2).toISOString()
-  },
-  {
-    id: "case-102",
-    created_date: new Date(Date.now() - 3600000 * 5).toISOString(),
-    document_type: "national_id",
-    document_image_url: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=60",
-    live_face_image_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=60",
-    extracted_fields: {
-      name: "MARCUS CHEN",
-      id_number: "ID-7729104",
-      date_of_birth: "1988-11-03",
-      nationality: "SGP",
-      gender: "M"
-    },
-    tamper_score: 45,
-    tamper_findings: [
-      { x: 35, y: 40, radius: 15, label: "Minor pixel artifacts around name boundary" }
-    ],
-    tamper_summary: "Slight edge distortion around text fields detected. Requires manual inspector verification.",
-    face_match_score: 72,
-    face_match_summary: "Moderate facial similarity; lighting variance in live capture reduced automated match score.",
-    judge_score: 64,
-    status: "decided",
-    decision: "manual_review",
-    officer_notes: "Secondary physical inspection recommended.",
-    decided_by: "Officer Alex Mercer",
-    decided_at: new Date(Date.now() - 3600000 * 5).toISOString()
-  },
-  {
-    id: "case-103",
-    created_date: new Date(Date.now() - 3600000 * 12).toISOString(),
-    document_type: "visa",
-    document_image_url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=60",
-    live_face_image_url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&auto=format&fit=crop&q=60",
-    extracted_fields: {
-      name: "VIKTOR PETROV",
-      visa_number: "V-9938102",
-      visa_type: "Tourist B2",
-      stay_duration: "90 Days"
-    },
-    tamper_score: 85,
-    tamper_findings: [
-      { x: 25, y: 30, radius: 20, label: "Photo replacement border mismatch" },
-      { x: 60, y: 70, radius: 12, label: "Inconsistent font baseline" }
-    ],
-    tamper_summary: "Heavy tampering detected: photo overlay boundaries mismatch substrate paper texture, and expiration font differs from issuing authority standard.",
-    face_match_score: 35,
-    face_match_summary: "Biometric discrepancy: facial structure and nose-to-chin distance do not match the document photograph.",
-    judge_score: 25,
-    status: "decided",
-    decision: "rejected",
-    officer_notes: "Forged visa detected. Entry denied and reported.",
-    decided_by: "Officer Alex Mercer",
-    decided_at: new Date(Date.now() - 3600000 * 12).toISOString()
-  }
-];
+const initialCases = [];
 
 const initialSyntheticDocs = [
   {
@@ -105,8 +27,8 @@ const initialSyntheticDocs = [
   }
 ];
 
-let localCases = [...initialCases];
-let localSyntheticDocs = [...initialSyntheticDocs];
+let localCases = getStoredCases(initialCases);
+let localSyntheticDocs = getStoredSyntheticDocs(initialSyntheticDocs);
 
 // Mock user for local mode
 const mockUser = {
@@ -164,28 +86,32 @@ export const base44 = new Proxy(rawClient, {
           } catch {
             if (name === "analyzeDocument") {
               const docType = payload.document_type || "passport";
+              const analysis = await analyzeBiometricAndDocumentMatch(
+                payload.document_image_url,
+                payload.live_face_image_url || payload.document_image_url,
+                payload.strictness || "standard",
+                docType
+              );
               return {
                 data: {
-                  extracted_fields: {
-                    document_type: docType.toUpperCase(),
-                    holder_name: "SAMPLE CITIZEN",
-                    document_number: "A" + Math.floor(10000000 + Math.random() * 90000000),
-                    issuing_country: "USA",
-                    date_of_expiry: "2032-12-31"
-                  },
-                  tamper_score: 12,
-                  tamper_findings: [
-                    { x: 42, y: 35, radius: 10, label: "Minor reflection artifact on photo margin" }
-                  ],
-                  tamper_summary: `AI screening of ${docType} complete. High substrate integrity; no structural tampering detected.`
+                  extracted_fields: analysis.extractedFields,
+                  tamper_score: analysis.tamperScore,
+                  tamper_findings: analysis.tamperFindings,
+                  tamper_summary: analysis.tamperSummary
                 }
               };
             }
             if (name === "matchFaces") {
+              const analysis = await analyzeBiometricAndDocumentMatch(
+                payload.document_image_url,
+                payload.live_face_image_url,
+                payload.strictness || "standard",
+                payload.document_type || "passport"
+              );
               return {
                 data: {
-                  face_match_score: 91,
-                  face_match_summary: "Biometric landmark alignment confirms high probability match between document photo and live facial scan."
+                  face_match_score: analysis.faceMatchScore,
+                  face_match_summary: analysis.faceMatchSummary
                 }
               };
             }
@@ -199,24 +125,28 @@ export const base44 = new Proxy(rawClient, {
       return {
         Case: {
           list: async (order, limitVal = 100) => {
-            try {
-              const snap = await getDocs(collection(db, "cases"));
-              if (!snap.empty) {
-                const fbCases = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-                fbCases.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-                return fbCases.slice(0, limitVal);
+            if (!isForceOffline()) {
+              try {
+                const snap = await getDocs(collection(db, "cases"));
+                if (!snap.empty) {
+                  const fbCases = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                  fbCases.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+                  return fbCases.slice(0, limitVal);
+                }
+              } catch (err) {
+                console.warn("Firebase case fetch fallback:", err);
               }
-            } catch (err) {
-              console.warn("Firebase case fetch fallback:", err);
             }
             return localCases.slice(0, limitVal);
           },
           get: async (id) => {
-            try {
-              const docSnap = await getDoc(doc(db, "cases", id));
-              if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() };
-            } catch (err) {
-              console.warn("Firebase get case fallback:", err);
+            if (!isForceOffline()) {
+              try {
+                const docSnap = await getDoc(doc(db, "cases", id));
+                if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() };
+              } catch (err) {
+                console.warn("Firebase get case fallback:", err);
+              }
             }
             return localCases.find(c => c.id === id) || localCases[0];
           },
@@ -229,39 +159,50 @@ export const base44 = new Proxy(rawClient, {
               officer_notes: "",
               ...data
             };
-            try {
-              await setDoc(doc(db, "cases", id), newCase);
-            } catch (err) {
-              console.warn("Firebase create case fallback:", err);
+            if (!isForceOffline()) {
+              try {
+                await setDoc(doc(db, "cases", id), newCase);
+              } catch (err) {
+                console.warn("Firebase create case fallback:", err);
+              }
             }
             localCases = [newCase, ...localCases];
+            setStoredCases(localCases);
             return newCase;
           },
           update: async (id, data) => {
-            try {
-              await updateDoc(doc(db, "cases", id), data);
-            } catch (err) {
-              try { await setDoc(doc(db, "cases", id), data, { merge: true }); } catch {}
+            if (!isForceOffline()) {
+              try {
+                await updateDoc(doc(db, "cases", id), data);
+              } catch (err) {
+                try { await setDoc(doc(db, "cases", id), data, { merge: true }); } catch {}
+              }
             }
             const index = localCases.findIndex(c => c.id === id);
             if (index !== -1) {
               localCases[index] = { ...localCases[index], ...data };
+              setStoredCases(localCases);
               return localCases[index];
             }
-            return { id, ...data };
+            const created = { id, ...data };
+            localCases = [created, ...localCases];
+            setStoredCases(localCases);
+            return created;
           }
         },
         SyntheticDocument: {
           list: async (order, limitVal = 100) => {
-            try {
-              const snap = await getDocs(collection(db, "synthetic_documents"));
-              if (!snap.empty) {
-                const fbDocs = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-                fbDocs.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-                return fbDocs.slice(0, limitVal);
+            if (!isForceOffline()) {
+              try {
+                const snap = await getDocs(collection(db, "synthetic_documents"));
+                if (!snap.empty) {
+                  const fbDocs = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                  fbDocs.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+                  return fbDocs.slice(0, limitVal);
+                }
+              } catch (err) {
+                console.warn("Firebase synthetic docs fallback:", err);
               }
-            } catch (err) {
-              console.warn("Firebase synthetic docs fallback:", err);
             }
             return localSyntheticDocs.slice(0, limitVal);
           },
@@ -272,12 +213,15 @@ export const base44 = new Proxy(rawClient, {
               created_date: new Date().toISOString(),
               ...data
             };
-            try {
-              await setDoc(doc(db, "synthetic_documents", id), newDoc);
-            } catch (err) {
-              console.warn("Firebase create synth doc fallback:", err);
+            if (!isForceOffline()) {
+              try {
+                await setDoc(doc(db, "synthetic_documents", id), newDoc);
+              } catch (err) {
+                console.warn("Firebase create synth doc fallback:", err);
+              }
             }
             localSyntheticDocs = [newDoc, ...localSyntheticDocs];
+            setStoredSyntheticDocs(localSyntheticDocs);
             return newDoc;
           }
         }

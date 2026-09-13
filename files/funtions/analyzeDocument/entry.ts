@@ -6,7 +6,7 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { document_image_url, document_type } = await req.json();
+    const { document_image_url, document_type, strictness = "standard" } = await req.json();
     if (!document_image_url || !document_type) {
       return Response.json({ error: 'document_image_url and document_type are required' }, { status: 400 });
     }
@@ -19,7 +19,7 @@ export default async function(req) {
       permit: 'name, permit_number, permit_type, valid_from, valid_until'
     };
 
-    const prompt = `You are an AI border-security document screening assistant. Analyze the attached ${document_type} image.
+    const prompt = `You are an AI border-security document screening assistant. Analyze the attached ${document_type} image under ${strictness} inspection strictness.
 1. Extract these fields if visible: ${fieldGuide[document_type] || 'name, document_number, date_of_birth, date_of_expiry'}.
 2. Inspect the document for signs of tampering or forgery: photo replacement, text/font manipulation, stamp forgery, inconsistent spacing/alignment, mismatched fonts, blurring or pixel artifacts around fields, unnatural edges.
 3. Produce a tamper_score from 0 (clean, no signs of tampering) to 100 (heavily tampered/forged).
