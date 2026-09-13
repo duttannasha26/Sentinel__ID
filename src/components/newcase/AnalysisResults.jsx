@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, AlertTriangle, XCircle, Download } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Download, Loader2 } from "lucide-react";
 import { downloadCaseReport } from "@/lib/reportGenerator";
 
 function ScoreBadge({ label, score, invert }) {
@@ -20,6 +20,16 @@ function ScoreBadge({ label, score, invert }) {
 export default function AnalysisResults({ caseData, onDecide, decided }) {
   const [notes, setNotes] = useState(caseData.officer_notes || "");
   const [submitting, setSubmitting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      await downloadCaseReport(caseData);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const submit = async (decision) => {
     setSubmitting(true);
@@ -138,8 +148,9 @@ export default function AnalysisResults({ caseData, onDecide, decided }) {
           <p className="text-sm text-slate-600">
             Decision recorded: <span className="font-semibold capitalize">{caseData.decision.replace("_", " ")}</span>
           </p>
-          <Button variant="outline" onClick={() => downloadCaseReport(caseData)} className="gap-2">
-            <Download className="w-4 h-4" /> Download Report
+          <Button variant="outline" disabled={downloading} onClick={handleDownloadReport} className="gap-2">
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? "Generating Report..." : "Download Report"}
           </Button>
         </div>
       )}
