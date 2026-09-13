@@ -1,0 +1,96 @@
+{
+  "name": "Case",
+  "type": "object",
+  "properties": {
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "passport",
+        "visa",
+        "national_id",
+        "driving_license",
+        "permit"
+      ],
+      "default": "passport"
+    },
+    "document_image_url": {
+      "type": "string"
+    },
+    "live_face_image_url": {
+      "type": "string"
+    },
+    "extracted_fields": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tamper_score": {
+      "type": "number",
+      "default": 0
+    },
+    "tamper_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "radius": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tamper_summary": {
+      "type": "string"
+    },
+    "face_match_score": {
+      "type": "number",
+      "default": 0
+    },
+    "face_match_summary": {
+      "type": "string"
+    },
+    "judge_score": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "capturing",
+        "analyzed",
+        "decided"
+      ],
+      "default": "capturing"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "manual_review",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "officer_notes": {
+      "type": "string"
+    },
+    "decided_by": {
+      "type": "string"
+    },
+    "decided_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "document_type"
+  ]
+}
