@@ -1,6 +1,8 @@
 import { base44 as rawClient } from './client';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, getDoc, doc, setDoc, updateDoc, query, orderBy, limit as limitQuery } from 'firebase/firestore';
 
-// Initial local sample data for immediate local preview
+// Initial local sample data for immediate local preview & fallback
 const initialCases = [
   {
     id: "case-101",
@@ -106,7 +108,7 @@ const initialSyntheticDocs = [
 let localCases = [...initialCases];
 let localSyntheticDocs = [...initialSyntheticDocs];
 
-// Mock user for offline mode
+// Mock user for local mode
 const mockUser = {
   id: "user-dev-1",
   full_name: "Officer Alex Mercer",
@@ -114,7 +116,7 @@ const mockUser = {
   role: "border_officer"
 };
 
-// Create a proxy wrapper around the raw Base44 client
+// Create a proxy wrapper around raw Base44 client integrated with Firebase
 export const base44 = new Proxy(rawClient, {
   get(target, prop) {
     if (prop === 'app') {
@@ -123,7 +125,7 @@ export const base44 = new Proxy(rawClient, {
           try {
             return await target.app.getPublicSettings();
           } catch {
-            return { id: "local-app", public_settings: { name: "Sentinel ID" } };
+            return { id: "sentinel-id-firebase", public_settings: { name: "Sentinel ID" } };
           }
         }
       };
@@ -196,37 +198,51 @@ export const base44 = new Proxy(rawClient, {
     if (prop === 'entities') {
       return {
         Case: {
-          list: async (order, limit = 100) => {
+          list: async (order, limitVal = 100) => {
             try {
-              const res = await target.entities.Case.list(order, limit);
-              if (res && res.length > 0) return res;
-            } catch {}
-            return localCases.slice(0, limit);
+              const snap = await getDocs(collection(db, "cases"));
+              if (!snap.empty) {
+                const fbCases = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                fbCases.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+                return fbCases.slice(0, limitVal);
+              }
+            } catch (err) {
+              console.warn("Firebase case fetch fallback:", err);
+            }
+            return localCases.slice(0, limitVal);
           },
           get: async (id) => {
             try {
-              return await target.entities.Case.get(id);
-            } catch {}
+              const docSnap = await getDoc(doc(db, "cases", id));
+              if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() };
+            } catch (err) {
+              console.warn("Firebase get case fallback:", err);
+            }
             return localCases.find(c => c.id === id) || localCases[0];
           },
           create: async (data) => {
-            try {
-              return await target.entities.Case.create(data);
-            } catch {}
+            const id = "case-" + Date.now();
             const newCase = {
-              id: "case-" + Date.now(),
+              id,
               created_date: new Date().toISOString(),
               decision: "pending",
               officer_notes: "",
               ...data
             };
+            try {
+              await setDoc(doc(db, "cases", id), newCase);
+            } catch (err) {
+              console.warn("Firebase create case fallback:", err);
+            }
             localCases = [newCase, ...localCases];
             return newCase;
           },
           update: async (id, data) => {
             try {
-              return await target.entities.Case.update(id, data);
-            } catch {}
+              await updateDoc(doc(db, "cases", id), data);
+            } catch (err) {
+              try { await setDoc(doc(db, "cases", id), data, { merge: true }); } catch {}
+            }
             const index = localCases.findIndex(c => c.id === id);
             if (index !== -1) {
               localCases[index] = { ...localCases[index], ...data };
@@ -236,22 +252,31 @@ export const base44 = new Proxy(rawClient, {
           }
         },
         SyntheticDocument: {
-          list: async (order, limit = 100) => {
+          list: async (order, limitVal = 100) => {
             try {
-              const res = await target.entities.SyntheticDocument.list(order, limit);
-              if (res && res.length > 0) return res;
-            } catch {}
-            return localSyntheticDocs.slice(0, limit);
+              const snap = await getDocs(collection(db, "synthetic_documents"));
+              if (!snap.empty) {
+                const fbDocs = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                fbDocs.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+                return fbDocs.slice(0, limitVal);
+              }
+            } catch (err) {
+              console.warn("Firebase synthetic docs fallback:", err);
+            }
+            return localSyntheticDocs.slice(0, limitVal);
           },
           create: async (data) => {
-            try {
-              return await target.entities.SyntheticDocument.create(data);
-            } catch {}
+            const id = "synth-" + Date.now();
             const newDoc = {
-              id: "synth-" + Date.now(),
+              id,
               created_date: new Date().toISOString(),
               ...data
             };
+            try {
+              await setDoc(doc(db, "synthetic_documents", id), newDoc);
+            } catch (err) {
+              console.warn("Firebase create synth doc fallback:", err);
+            }
             localSyntheticDocs = [newDoc, ...localSyntheticDocs];
             return newDoc;
           }
