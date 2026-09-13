@@ -219,12 +219,38 @@ Content-Transfer-Encoding: 8bit
     </div>
   ` : ''}
 
-  <h2>2. Quantitative Verification Scores</h2>
-  <div class="score-box">
-    <b>Tamper Risk Score:</b> ${c.tamper_score ?? 'N/A'} / 100<br/>
-    <b>Face Match Score:</b> ${c.face_match_score ?? 'N/A'} / 100<br/>
-    <b>Overall Judge Score:</b> <b>${c.judge_score ?? 'N/A'} / 100</b>
-  </div>
+  <h2>2. Quantitative Verification Scores (Round Dashboard Metrics)</h2>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr>
+      <td style="width: 33.33%; text-align: center; padding: 14px; border: 1px solid #cbd5e1; background-color: #f8fafc; vertical-align: top;">
+        <div style="font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Tamper Risk Score</div>
+        <div style="width: 75px; height: 75px; border-radius: 50%; border: 6px solid ${(c.tamper_score ?? 0) < 30 ? '#10b981' : (c.tamper_score ?? 0) <= 60 ? '#f59e0b' : '#f43f5e'}; margin: 10px auto; line-height: 75px; font-size: 22px; font-weight: bold; color: ${(c.tamper_score ?? 0) < 30 ? '#047857' : (c.tamper_score ?? 0) <= 60 ? '#b45309' : '#be123c'}; text-align: center;">
+          ${Math.round(c.tamper_score ?? 0)}
+        </div>
+        <div style="font-size: 11px; font-weight: bold; color: ${(c.tamper_score ?? 0) < 30 ? '#047857' : (c.tamper_score ?? 0) <= 60 ? '#b45309' : '#be123c'};">
+          ${(c.tamper_score ?? 0) < 30 ? 'Clean Substrate' : (c.tamper_score ?? 0) <= 60 ? 'Moderate Anomaly' : 'High Risk Anomaly'}
+        </div>
+      </td>
+      <td style="width: 33.33%; text-align: center; padding: 14px; border: 1px solid #cbd5e1; background-color: #f8fafc; vertical-align: top;">
+        <div style="font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Face Match Score</div>
+        <div style="width: 75px; height: 75px; border-radius: 50%; border: 6px solid ${(c.face_match_score ?? 0) > 70 ? '#10b981' : (c.face_match_score ?? 0) >= 40 ? '#f59e0b' : '#f43f5e'}; margin: 10px auto; line-height: 75px; font-size: 22px; font-weight: bold; color: ${(c.face_match_score ?? 0) > 70 ? '#047857' : (c.face_match_score ?? 0) >= 40 ? '#b45309' : '#be123c'}; text-align: center;">
+          ${Math.round(c.face_match_score ?? 0)}
+        </div>
+        <div style="font-size: 11px; font-weight: bold; color: ${(c.face_match_score ?? 0) > 70 ? '#047857' : (c.face_match_score ?? 0) >= 40 ? '#b45309' : '#be123c'};">
+          ${(c.face_match_score ?? 0) > 70 ? 'Biometric Match Confirmed' : (c.face_match_score ?? 0) >= 40 ? 'Partial Correlation' : 'Biometric Mismatch'}
+        </div>
+      </td>
+      <td style="width: 33.33%; text-align: center; padding: 14px; border: 1px solid #cbd5e1; background-color: #f8fafc; vertical-align: top;">
+        <div style="font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Overall Judge Score</div>
+        <div style="width: 75px; height: 75px; border-radius: 50%; border: 6px solid ${(c.judge_score ?? 0) > 70 ? '#10b981' : (c.judge_score ?? 0) >= 40 ? '#f59e0b' : '#f43f5e'}; margin: 10px auto; line-height: 75px; font-size: 22px; font-weight: bold; color: ${(c.judge_score ?? 0) > 70 ? '#047857' : (c.judge_score ?? 0) >= 40 ? '#b45309' : '#be123c'}; text-align: center;">
+          ${Math.round(c.judge_score ?? 0)}
+        </div>
+        <div style="font-size: 11px; font-weight: bold; color: ${(c.judge_score ?? 0) > 70 ? '#047857' : (c.judge_score ?? 0) >= 40 ? '#b45309' : '#be123c'};">
+          ${(c.judge_score ?? 0) > 70 ? 'High Verification Trust' : (c.judge_score ?? 0) >= 40 ? 'Moderate Trust Level' : 'High Risk Flagged'}
+        </div>
+      </td>
+    </tr>
+  </table>
 
   <h2>3. Extracted Document Fields</h2>
   <ul>${fields || '<li>No fields extracted.</li>'}</ul>

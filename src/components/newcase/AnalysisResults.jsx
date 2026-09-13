@@ -1,18 +1,71 @@
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, AlertTriangle, XCircle, Download, Loader2 } from "lucide-react";
 import { downloadCaseReport } from "@/lib/reportGenerator";
 
-function ScoreBadge({ label, score, invert }) {
-  const good = invert ? score < 30 : score > 70;
-  const warn = invert ? score >= 30 && score <= 60 : score >= 40 && score <= 70;
-  const color = good ? "text-emerald-600 bg-emerald-50" : warn ? "text-amber-600 bg-amber-50" : "text-rose-600 bg-rose-50";
+function RoundGaugeCard({ label, score, invert, statusText }) {
+  const safeScore = Math.max(0, Math.min(100, Math.round(score ?? 0)));
+  const good = invert ? safeScore < 30 : safeScore > 70;
+  const warn = invert ? safeScore >= 30 && safeScore <= 60 : safeScore >= 40 && safeScore <= 70;
+
+  const strokeColor = good ? "#10b981" : warn ? "#f59e0b" : "#f43f5e";
+  const cardBg = good
+    ? "bg-emerald-50/70 border-emerald-200/80 shadow-emerald-500/5"
+    : warn
+    ? "bg-amber-50/70 border-amber-200/80 shadow-amber-500/5"
+    : "bg-rose-50/70 border-rose-200/80 shadow-rose-500/5";
+
+  const textColor = good ? "text-emerald-700" : warn ? "text-amber-700" : "text-rose-700";
+
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (safeScore / 100) * circumference;
+
   return (
-    <div className={`rounded-xl px-4 py-3 ${color}`}>
-      <p className="text-xs font-medium opacity-70">{label}</p>
-      <p className="text-2xl font-semibold">{Math.round(score)}</p>
+    <div className={`flex flex-col items-center p-4 rounded-2xl border ${cardBg} shadow-sm transition-all hover:scale-[1.02]`}>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">{label}</p>
+
+      {/* Round Dashboard Gauge */}
+      <div className="relative w-28 h-28 flex items-center justify-center my-1">
+        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+          {/* Background Track */}
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            className="stroke-slate-200/80"
+            strokeWidth="8"
+            fill="transparent"
+          />
+          {/* Animated Gauge Ring */}
+          <motion.circle
+            cx="50"
+            cy="50"
+            r={radius}
+            stroke={strokeColor}
+            strokeWidth="8"
+            strokeLinecap="round"
+            fill="transparent"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset }}
+            transition={{ duration: 1.1, ease: "easeOut" }}
+          />
+        </svg>
+
+        {/* Center Percentage Value */}
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className={`text-2xl font-extrabold ${textColor}`}>{safeScore}</span>
+          <span className="text-[10px] font-semibold text-slate-400">/ 100</span>
+        </div>
+      </div>
+
+      <p className={`mt-2 text-xs font-semibold text-center leading-tight ${textColor}`}>
+        {statusText}
+      </p>
     </div>
   );
 }
@@ -36,6 +89,14 @@ export default function AnalysisResults({ caseData, onDecide, decided }) {
     await onDecide(decision, notes);
     setSubmitting(false);
   };
+
+  const tamperScore = caseData.tamper_score ?? 0;
+  const faceScore = caseData.face_match_score ?? 0;
+  const judgeScore = caseData.judge_score ?? 0;
+
+  const tamperStatus = tamperScore < 30 ? "Clean Substrate" : tamperScore <= 60 ? "Moderate Anomaly" : "High Tamper Risk";
+  const faceStatus = faceScore > 70 ? "Biometric Match Confirmed" : faceScore >= 40 ? "Partial Match" : "Biometric Mismatch";
+  const judgeStatus = judgeScore > 70 ? "High Verification Trust" : judgeScore >= 40 ? "Moderate Trust" : "High Risk Flagged";
 
   return (
     <div className="space-y-6">
@@ -84,10 +145,29 @@ export default function AnalysisResults({ caseData, onDecide, decided }) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
-        <ScoreBadge label="Tamper Risk" score={caseData.tamper_score} invert />
-        <ScoreBadge label="Face Match" score={caseData.face_match_score} />
-        <ScoreBadge label="Judge Score" score={caseData.judge_score} />
+      {/* Round Dashboard Score Gauges */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Verification Dashboard Metrics</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <RoundGaugeCard
+            label="Tamper Risk Score"
+            score={tamperScore}
+            invert={true}
+            statusText={tamperStatus}
+          />
+          <RoundGaugeCard
+            label="Face Match Score"
+            score={faceScore}
+            invert={false}
+            statusText={faceStatus}
+          />
+          <RoundGaugeCard
+            label="Overall Judge Score"
+            score={judgeScore}
+            invert={false}
+            statusText={judgeStatus}
+          />
+        </div>
       </div>
 
       {caseData.face_match_score === 0 && (
